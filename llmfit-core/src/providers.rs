@@ -3458,25 +3458,34 @@ mod tests {
 
         // Save and restore the original value (or absence) of LMSTUDIO_API_KEY.
         let had_key = env::var("LMSTUDIO_API_KEY").ok();
-        env::remove_var("LMSTUDIO_API_KEY");
+        // SAFETY: This test is single-threaded and restores the env var at the end.
+        unsafe {
+            env::remove_var("LMSTUDIO_API_KEY");
+        }
 
         let provider = LmStudioProvider::default();
         assert!(provider.api_key.is_none());
 
         // Set to a real value — should be picked up.
-        env::set_var("LMSTUDIO_API_KEY", "my-secret-key");
+        unsafe {
+            env::set_var("LMSTUDIO_API_KEY", "my-secret-key");
+        }
         let provider2 = LmStudioProvider::default();
         assert_eq!(provider2.api_key, Some("my-secret-key".to_string()));
 
         // Set to empty string — must NOT produce `Some("")`.
-        env::set_var("LMSTUDIO_API_KEY", "");
+        unsafe {
+            env::set_var("LMSTUDIO_API_KEY", "");
+        }
         let provider3 = LmStudioProvider::default();
         assert!(provider3.api_key.is_none());
 
         // Restore original state.
-        match had_key {
-            Some(val) => env::set_var("LMSTUDIO_API_KEY", val),
-            None => env::remove_var("LMSTUDIO_API_KEY"),
+        unsafe {
+            match had_key {
+                Some(val) => env::set_var("LMSTUDIO_API_KEY", val),
+                None => env::remove_var("LMSTUDIO_API_KEY"),
+            }
         }
     }
 
