@@ -45,45 +45,56 @@ impl InstalledIndex {
         }
     }
 
-    /// Synchronously detect installed models across all providers.
-    /// Suitable for CLI paths; the TUI performs detection in background
-    /// threads and populates the index fields individually.
+    /// Detect installed models across all providers in parallel.
+    ///
+    /// Each provider query is issued on its own thread so that a single
+    /// offline/slow backend (worst case ~1.5 s timeout) doesn't serialize
+    /// into ~9 s of total blocking time for the CLI path.
     pub fn detect_all() -> Self {
-        let (ollama, ollama_count) = {
-            let p = OllamaProvider::new();
-            p.installed_models_counted()
-        };
-        let mlx = MlxProvider::new().installed_models();
-        let (llamacpp, llamacpp_count) = {
-            let p = LlamaCppProvider::new();
-            p.installed_models_counted()
-        };
-        let (docker_mr, docker_mr_count) = {
-            let p = DockerModelRunnerProvider::new();
-            p.installed_models_counted()
-        };
-        let (lmstudio, lmstudio_count) = {
-            let p = LmStudioProvider::new();
-            p.installed_models_counted()
-        };
-        let (vllm, vllm_count) = {
-            let p = VllmProvider::new();
-            p.installed_models_counted()
-        };
+        std::thread::scope(|s| {
+            let ollama = s.spawn(|| {
+                let p = OllamaProvider::new();
+                p.installed_models_counted()
+            });
+            let mlx = s.spawn(|| MlxProvider::new().installed_models());
+            let llamacpp = s.spawn(|| {
+                let p = LlamaCppProvider::new();
+                p.installed_models_counted()
+            });
+            let docker_mr = s.spawn(|| {
+                let p = DockerModelRunnerProvider::new();
+                p.installed_models_counted()
+            });
+            let lmstudio = s.spawn(|| {
+                let p = LmStudioProvider::new();
+                p.installed_models_counted()
+            });
+            let vllm = s.spawn(|| {
+                let p = VllmProvider::new();
+                p.installed_models_counted()
+            });
 
-        Self {
-            ollama,
-            ollama_count,
-            mlx,
-            llamacpp,
-            llamacpp_count,
-            docker_mr,
-            docker_mr_count,
-            lmstudio,
-            lmstudio_count,
-            vllm,
-            vllm_count,
-        }
+            let (ollama, ollama_count) = ollama.join().unwrap();
+            let mlx = mlx.join().unwrap();
+            let (llamacpp, llamacpp_count) = llamacpp.join().unwrap();
+            let (docker_mr, docker_mr_count) = docker_mr.join().unwrap();
+            let (lmstudio, lmstudio_count) = lmstudio.join().unwrap();
+            let (vllm, vllm_count) = vllm.join().unwrap();
+
+            Self {
+                ollama,
+                ollama_count,
+                mlx,
+                llamacpp,
+                llamacpp_count,
+                docker_mr,
+                docker_mr_count,
+                lmstudio,
+                lmstudio_count,
+                vllm,
+                vllm_count,
+            }
+        })
     }
 
     /// Returns `true` when the model is installed in **any** provider.
