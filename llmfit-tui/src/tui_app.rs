@@ -762,19 +762,9 @@ impl App {
         let lmstudio_available = false;
         let vllm = VllmProvider::new();
         let vllm_available = false;
-        let installed = llmfit_core::analysis::InstalledIndex {
-            ollama: HashSet::new(),
-            ollama_count: 0,
-            mlx: HashSet::new(),
-            llamacpp: llamacpp_installed,
-            llamacpp_count: llamacpp_installed_count,
-            docker_mr: HashSet::new(),
-            docker_mr_count: 0,
-            lmstudio: HashSet::new(),
-            lmstudio_count: 0,
-            vllm: HashSet::new(),
-            vllm_count: 0,
-        };
+        let mut installed = llmfit_core::analysis::InstalledIndex::empty();
+        installed.llamacpp = llamacpp_installed;
+        installed.llamacpp_count = llamacpp_installed_count;
 
         // Spawn background provider detection for network-based providers
         let (provider_tx, provider_detection_rx) = mpsc::channel();
